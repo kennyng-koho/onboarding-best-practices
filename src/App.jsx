@@ -143,7 +143,7 @@ const OnboardingFlow = () => {
 
   const currentStep = steps.find(s => s.id === activeStep);
 
-  const fetchGeminiStrategy = async () => {
+  const fetchAIStrategy = async () => {
     if (!productNiche.trim()) {
       setError("Please describe your product first.");
       return;
@@ -151,46 +151,34 @@ const OnboardingFlow = () => {
     setIsLoading(true);
     setError(null);
     setAiStrategy(null);
-    const apiKey = "";
-    const systemPrompt = `You are a world-class Growth & Product Onboarding expert. Output MUST be valid JSON with properties 'tactics' (array of 3 strings) and 'copy_suggestion' (string).`;
-    const userQuery = `Product: "${productNiche}". Step: "${currentStep.title}". Provide 3 growth tactics and 1 copy suggestion.`;
 
-    const makeRequest = async (retries = 0) => {
-      try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: userQuery }] }],
-            systemInstruction: { parts: [{ text: systemPrompt }] },
-            generationConfig: {
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: "OBJECT",
-                properties: {
-                  tactics: { type: "ARRAY", items: { type: "STRING" } },
-                  copy_suggestion: { type: "STRING" }
-                }
-              }
-            }
-          })
-        });
-        if (!response.ok) throw new Error('API request failed');
-        const result = await response.json();
-        const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-        setAiStrategy(JSON.parse(text));
-      } catch (err) {
-        if (retries < 5) {
-          const delay = Math.pow(2, retries) * 1000;
-          await new Promise(res => setTimeout(res, delay));
-          return makeRequest(retries + 1);
-        }
-        setError("Failed to generate strategy.");
-      } finally {
-        setIsLoading(false);
+    try {
+      const response = await fetch('/api/generate-strategy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productNiche,
+          stepTitle: currentStep.title,
+          stepDescription: currentStep.details.description
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('API request failed');
       }
-    };
-    await makeRequest();
+
+      const result = await response.json();
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      setAiStrategy(result);
+    } catch (err) {
+      setError("Failed to generate strategy. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -286,7 +274,7 @@ const OnboardingFlow = () => {
                         onChange={(e) => setProductNiche(e.target.value)}
                       />
                       <button
-                        onClick={fetchGeminiStrategy}
+                        onClick={fetchAIStrategy}
                         disabled={isLoading}
                         className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white px-4 rounded-xl transition-all flex items-center gap-2 text-xs font-bold"
                       >
