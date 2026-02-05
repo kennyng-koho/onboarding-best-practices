@@ -6,34 +6,35 @@ export default async (req) => {
   try {
     const { productNiche, stepTitle, stepDescription } = await req.json();
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01'
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
+        model: 'gpt-4o-mini',
         messages: [
           {
+            role: 'system',
+            content: 'You are a world-class Growth & Product Onboarding expert. Always respond with valid JSON only, no markdown or extra text.'
+          },
+          {
             role: 'user',
-            content: `You are a world-class Growth & Product Onboarding expert.
-
-Product: "${productNiche}"
+            content: `Product: "${productNiche}"
 Onboarding Step: "${stepTitle}"
 Step Description: ${stepDescription}
 
 Provide exactly 3 highly specific, actionable growth tactics for this product at this onboarding stage, plus 1 compelling copy suggestion (ad headline, email subject, or UI text).
 
-Respond in this exact JSON format:
+Respond in this exact JSON format only:
 {
   "tactics": ["tactic 1", "tactic 2", "tactic 3"],
   "copy_suggestion": "your copy here"
 }`
           }
-        ]
+        ],
+        temperature: 0.7
       })
     });
 
@@ -46,9 +47,9 @@ Respond in this exact JSON format:
     }
 
     const result = await response.json();
-    const text = result.content[0].text;
+    const text = result.choices[0].message.content;
 
-    // Parse the JSON from Claude's response
+    // Parse the JSON from GPT's response
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return new Response(JSON.stringify({ error: 'Invalid response format' }), {
